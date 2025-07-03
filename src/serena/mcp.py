@@ -147,28 +147,23 @@ class SerenaMCPFactory:
             This is useful for debugging language server issues.
         :param tool_timeout: Timeout in seconds for tool execution. If not specified, will take the value from the serena configuration.
         """
-        try:
-            config = SerenaConfig.from_config_file()
+        config = SerenaConfig.from_config_file()
 
-            # update configuration with the provided parameters
-            if enable_web_dashboard is not None:
-                config.web_dashboard = enable_web_dashboard
-            if enable_gui_log_window is not None:
-                config.gui_log_window_enabled = enable_gui_log_window
-            if log_level is not None:
-                log_level = cast(Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], log_level.upper())
-                config.log_level = logging.getLevelNamesMapping()[log_level]
-            if trace_lsp_communication is not None:
-                config.trace_lsp_communication = trace_lsp_communication
-            if tool_timeout is not None:
-                config.tool_timeout = tool_timeout
+        # update configuration with the provided parameters
+        if enable_web_dashboard is not None:
+            config.web_dashboard = enable_web_dashboard
+        if enable_gui_log_window is not None:
+            config.gui_log_window_enabled = enable_gui_log_window
+        if log_level is not None:
+            log_level = cast(Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"], log_level.upper())
+            config.log_level = logging.getLevelNamesMapping()[log_level]
+        if trace_lsp_communication is not None:
+            config.trace_lsp_communication = trace_lsp_communication
+        if tool_timeout is not None:
+            config.tool_timeout = tool_timeout
 
-            modes_instances = [SerenaAgentMode.load(mode) for mode in modes]
-            self._instantiate_agent(config, modes_instances)
-
-        except Exception as e:
-            show_fatal_exception_safe(e)
-            raise
+        modes_instances = [SerenaAgentMode.load(mode) for mode in modes]
+        self._instantiate_agent(config, modes_instances)
 
         # Override model_config to disable the use of `.env` files for reading settings, because user projects are likely to contain
         # `.env` files (e.g. containing LOG_LEVEL) that are not supposed to override the MCP settings;
@@ -346,30 +341,35 @@ def start_mcp_server(
     Use --context to specify the execution environment and --mode to specify behavior mode(s).
     The modes may be adjusted after startup (via the corresponding tool), but the context cannot be changed.
     """
-    # Prioritize the positional argument if provided
-    # This is for backward compatibility with the old CLI, should be removed in the future!
-    project_file = project_file_arg if project_file_arg is not None else project
+    try:
+        # Prioritize the positional argument if provided
+        # This is for backward compatibility with the old CLI, should be removed in the future!
+        project_file = project_file_arg if project_file_arg is not None else project
 
-    mcp_factory = SerenaMCPFactorySingleProcess(context=context, project=project_file)
-    mcp_server = mcp_factory.create_mcp_server(
-        host=host,
-        port=port,
-        modes=modes,
-        enable_web_dashboard=enable_web_dashboard,
-        enable_gui_log_window=enable_gui_log_window,
-        log_level=log_level,
-        trace_lsp_communication=trace_lsp_communication,
-        tool_timeout=tool_timeout,
-    )
-
-    # log after server creation such that the log appears in the GUI
-    if project_file_arg is not None:
-        log.warning(
-            "The positional argument for the project file path is deprecated and will be removed in the future! "
-            "Please pass the project file path via the `--project` option instead.\n"
-            f"Used path: {project_file}"
+        mcp_factory = SerenaMCPFactorySingleProcess(context=context, project=project_file)
+        mcp_server = mcp_factory.create_mcp_server(
+            host=host,
+            port=port,
+            modes=modes,
+            enable_web_dashboard=enable_web_dashboard,
+            enable_gui_log_window=enable_gui_log_window,
+            log_level=log_level,
+            trace_lsp_communication=trace_lsp_communication,
+            tool_timeout=tool_timeout,
         )
 
-    log.info("Starting MCP server ...")
+        # log after server creation such that the log appears in the GUI
+        if project_file_arg is not None:
+            log.warning(
+                "The positional argument for the project file path is deprecated and will be removed in the future! "
+                "Please pass the project file path via the `--project` option instead.\n"
+                f"Used path: {project_file}"
+            )
 
-    mcp_server.run(transport=transport)
+        log.info("Starting MCP server ...")
+
+        mcp_server.run(transport=transport)
+
+    except Exception as e:
+        show_fatal_exception_safe(e)
+        raise
